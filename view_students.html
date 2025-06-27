@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>View Students</title>
+  <style>
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
+    th { background-color: #002855; color: white; }
+  </style>
+</head>
+<body>
+  <h2>Student List</h2>
+  <table>
+    <tr>
+      <th>Reg ID</th>
+      <th>Name</th>
+      <th>Email</th>
+      <th>Department</th>
+      <th>Class</th>
+    </tr>
+    {% for student in students %}
+    <tr>
+      <td>{{ student.reg_id }}</td>
+      <td>{{ student.name }}</td>
+      <td>{{ student.email }}</td>
+      <td>{{ student.department }}</td>
+      <td>{{ student.class_ }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</body>
+</html>

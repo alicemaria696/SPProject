@@ -1,0 +1,50 @@
+<!-- student_dashboard.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Dashboard | Real-Time Assessment</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; display: flex; }
+    .sidebar {
+      width: 200px; background: #002855; color: white; height: 100vh; padding-top: 2rem; display: flex; flex-direction: column;
+    }
+    .sidebar a {
+      color: white; text-decoration: none; padding: 1rem 2rem; display: block;
+    }
+    .sidebar a:hover { background: #004b93; }
+    .main {
+      flex-grow: 1; background: #f4f6f8; padding: 2rem;
+    }
+    .top {
+      margin-bottom: 1rem;
+    }
+    .assignments {
+      display: grid; grid-template-columns: 1fr; gap: 1rem;
+    }
+    .assignment {
+      background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <h3 style="text-align: center; color: white; margin-bottom: 2rem;">Subjects</h3>
+    <a href="#">Cyber Security</a>
+    <a href="#">AI & ML</a>
+    <a href="#">Data Structures</a>
+    <a href="#">Web Development</a>
+  </div>
+  <div class="main">
+    <div class="top">
+      <h2>My Assignments</h2>
+    </div>
+    <div class="assignments">
+      <div class="assignment">Cyber Security Assignment - 2025-05-05</div>
+      <div class="assignment">AI & ML Project - 2025-06-02</div>
+      <div class="assignment">Web Dev Task - 2025-06-10</div>
+    </div>
+  </div>
+</body>
+</html>

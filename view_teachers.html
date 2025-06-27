@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>View Teachers</title>
+  <style>
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
+    th { background-color: #002855; color: white; }
+  </style>
+</head>
+<body>
+  <h2>Teacher List</h2>
+  <table>
+    <tr>
+      <th>Reg ID</th>
+      <th>Name</th>
+      <th>Email</th>
+      <th>Department</th>
+    </tr>
+    {% for teacher in teachers %}
+    <tr>
+      <td>{{ teacher.reg_id }}</td>
+      <td>{{ teacher.name }}</td>
+      <td>{{ teacher.email }}</td>
+      <td>{{ teacher.department }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</body>
+</html>
