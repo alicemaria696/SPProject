@@ -1,8 +1,10 @@
+<!--Teacher dashboard-->
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Class Dashboard</title>
+  <title>Teacher Dashboard</title>
   <style>
     body { margin: 0; display: flex; font-family: Arial; background: #f4f6f8; }
     .sidebar {
@@ -17,17 +19,33 @@
     .main {
       padding: 2rem;
       flex-grow: 1;
+      overflow-y: auto;
     }
     .subject-header {
       display: flex; justify-content: space-between; align-items: center;
     }
     .add-btn {
-      background: #ff6600; color: white; padding: 0.5rem 1rem; border: none; border-radius: 8px; cursor: pointer;
-      text-decoration: none;
+      background: #ff6600; color: white; padding: 0.5rem 1rem; border: none;
+      border-radius: 8px; cursor: pointer; text-decoration: none;
     }
     .card {
-      background: white; padding: 1rem; margin-top: 1rem;
+      background: white; padding: 1rem; margin-top: 1.5rem;
       border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    table {
+      width: 100%; border-collapse: collapse; margin-top: 1rem;
+    }
+    th, td {
+      padding: 12px 15px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+    th {
+      background-color: #002855;
+      color: white;
+    }
+    tr:hover {
+      background-color: #f1f1f1;
     }
   </style>
 </head>
@@ -35,29 +53,60 @@
 
 <div class="sidebar">
   <a href="{{ url_for('view_students_by_class', class_id=class_id) }}">👨‍🎓 View Students</a>
-  <a href="#">📊 Student Performance</a>
+  <a href="{{ url_for('student_performance', class_id=class_id) }}">📊 Student Performance</a>
   <h3 style="text-align: center; margin-top: 2rem;">📚 Subjects</h3>
   {% for sub in subjects %}
     <a href="/subject/{{ sub.sub_id }}/assignments">{{ sub.s_name }}</a>
   {% else %}
     <p style="padding: 1rem;">No subjects</p>
   {% endfor %}
-   <a href="/logout">🚪 Logout</a>
+  <a href="/logout">🚪 Logout</a>
 </div>
 
-
-
-  <div class="main">
-    <div class="subject-header">
-      <h2>Subjects for Class ID: {{ class_id }}</h2>
-      <a class="add-btn" href="/class/{{ class_id }}/add_subject">➕ Add Subject</a>
-    </div>
-
-    <!-- Assignments would be listed here on subject click -->
-    <div class="card">
-      <p>Select a subject from the sidebar to view or add assignments.</p>
-    </div>
+<div class="main">
+  <div class="subject-header">
+    <h2>Subjects for Class ID: {{ class_id }}</h2>
+    <a class="add-btn" href="/class/{{ class_id }}/add_subject">➕ Add Subject</a>
   </div>
+
+  <div class="card">
+    <h3>📊 Student Performance</h3>
+    {% if results %}
+    <table>
+      <thead>
+        <tr>
+          <th>Student ID</th>
+          <th>Subject</th>
+          <th>Assignment</th>
+          <th>File</th>
+          <th>Matches</th>
+          <th>Marks</th>
+          <th>Status</th>
+          <th>On Time</th>
+          <th>Evaluated At</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in results %}
+        <tr>
+          <td>{{ r.student_id }}</td>
+          <td>{{ r.subject_name }}</td>
+          <td>{{ r.assignment_id }}</td>
+          <td>{{ r.file_name }}</td>
+          <td>{{ r.total_matches }}</td>
+          <td>{{ r.marks }}</td>
+          <td>{{ r.status }}</td>
+          <td>{{ 'Yes' if r.on_time else 'No' }}</td>
+          <td>{{ r.evaluated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p>No evaluation results available yet.</p>
+    {% endif %}
+  </div>
+</div>
 
 </body>
 </html>
