@@ -448,6 +448,8 @@ def evaluate_submission():
 def evaluate_submission():
     import spacy
     from collections import Counter
+    from sklearn.metrics.pairwise import cosine_similarity
+    from sklearn.feature_extraction.text import TfidfVectorizer
 
     nlp = spacy.load("en_core_web_sm")
 
@@ -462,12 +464,15 @@ def evaluate_submission():
     filepath = os.path.join(uploads_dir, filename)
     file.save(filepath)
 
+    # Get assignment
     assignment = Assignment.query.filter_by(title=assignment_title).first()
     if not assignment:
         return jsonify({'error': 'Assignment not found'}), 404
 
+    # Extract keywords
     keywords = [k.strip().lower() for k in assignment.keywords.split(',')] if assignment.keywords else []
 
+    # Extract text from file
     try:
         if filename.endswith('.pdf'):
             reader = PdfReader(filepath)
@@ -480,46 +485,64 @@ def evaluate_submission():
     except Exception as e:
         return jsonify({'error': f"Error reading file: {str(e)}"}), 500
 
+    # Process document with spaCy
     doc = nlp(text.lower())
     words = [token.text for token in doc if token.is_alpha]
     word_freq = Counter(words)
 
+    # ✅ Keyword-based score (max 70)
     match_count = sum(word_freq.get(kw, 0) for kw in keywords)
+    keyword_score = min((match_count / len(keywords)) * 70, 70) if keywords else 0
 
-    marks = 70 if match_count >= len(keywords) else 0
-    status = 'Pass' if marks == 70 else 'Fail'
+    # ✅ Semantic-based score (max 30)
+    sentence_texts = [sent.text.strip() for sent in doc.sents if sent.text.strip()]
+    vectorizer = TfidfVectorizer().fit(keywords + sentence_texts)
+    keyword_vecs = vectorizer.transform(keywords)
+    sentence_vecs = vectorizer.transform(sentence_texts)
 
+    semantic_matches = 0
+    for kv in keyword_vecs:
+        similarities = cosine_similarity(kv, sentence_vecs)
+        if similarities.max() > 0.5:
+            semantic_matches += 1
+
+    semantic_score = min((semantic_matches / len(keywords)) * 30, 30) if keywords else 0
+
+    # ✅ Final Score
+    total_marks = round(keyword_score + semantic_score, 2)
+    status = "Pass" if total_marks >= 50 else "Fail"
+
+    # Deadline check
     try:
         deadline = datetime.strptime(assignment.time, "%Y-%m-%dT%H:%M")
     except ValueError:
         return jsonify({'error': 'Invalid deadline format'}), 400
 
     on_time = datetime.now() <= deadline
-
     student_id = session.get('reg_id')
     subject = Subject.query.filter_by(sub_id=assignment.sub_id).first()
 
+    # Save to Submission
     submission = Submission(
         assignment_id=assignment.id,
         student_id=student_id,
         subject_name=subject.s_name,
         submitted_document=filename,
         upload_time=datetime.now(),
-        marks=marks,
+        marks=total_marks,
         status=status,
         on_time=on_time
     )
     db.session.add(submission)
-    db.session.commit()
 
-    # Also save to Result table
+    # Save to Result
     result = Result(
         assignment_id=assignment.id,
         student_id=student_id,
         subject_name=subject.s_name,
         file_name=filename,
         total_matches=match_count,
-        marks=marks,
+        marks=total_marks,
         status=status,
         on_time=on_time,
         evaluated_at=datetime.now()
@@ -530,10 +553,13 @@ def evaluate_submission():
     return jsonify({
         'title': assignment.title,
         'matches': match_count,
-        'marks': marks,
+        'keyword_score': round(keyword_score, 2),
+        'semantic_score': round(semantic_score, 2),
+        'marks': total_marks,
         'status': status,
         'on_time': on_time
     })
+
     
 @app.route('/teacher/<int:class_id>/performance')
 def student_performance(class_id):
