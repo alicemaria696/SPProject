@@ -85,3 +85,16 @@ class Result(db.Model):
     status = db.Column(db.String(50))  # 'Pass' or 'Fail'
     on_time = db.Column(db.Boolean)
     evaluated_at = db.Column(db.DateTime)
+    
+class ScriptAssignment(db.Model):
+    __tablename__ = 'script_assignment'
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    deadline = db.Column(db.DateTime, nullable=False)
+    total_marks = db.Column(db.Integer, nullable=False)
+    questions = db.Column(db.Text)
+    testcases = db.Column(db.JSON)
+    rubric = db.Column(db.Text)
+    compilation_time = db.Column(db.Integer)
+    sub_id = db.Column(db.Integer, db.ForeignKey('subject.sub_id'), nullable=False)
