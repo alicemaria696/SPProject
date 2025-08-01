@@ -1,6 +1,6 @@
-from flask import render_template, request, redirect, url_for, flash, session
+from flask import json, render_template, request, redirect, url_for, flash, session
 from app import app, db
-from app.models import Teacher, User, Student, Class, Subject, Assignment, Submission, Result
+from app.models import Teacher, User, Student, Class, Subject, Assignment, Submission, Result, ScriptAssignment
 from datetime import datetime
 import csv
 from io import TextIOWrapper
@@ -9,7 +9,7 @@ from werkzeug.utils import secure_filename
 from flask import jsonify
 from PyPDF2 import PdfReader
 import re
-import docx2txt
+import docx2txt 
 
 @app.route('/', methods=['GET', 'POST'])
 def login():
@@ -259,16 +259,36 @@ def student_dashboard():
     for subject in subjects:
         assignments = Assignment.query.filter_by(sub_id=subject.sub_id).all()
         for a in assignments:
+            formatted_time = a.time.strftime('%Y-%m-%d %H:%M') if isinstance(a.time, datetime) else a.time.replace('T', ' ')
             all_assignments.append({
                 'assignment_id': a.id,
                 'title': a.title,
                 'timestamp': a.timestamp.strftime('%Y-%m-%d %H:%M'),
-                'time': a.time,
+                'time': formatted_time,
                 'type': a.type,
                 'total_marks': a.total_marks,
                 'subject': subject.s_name,
                 'questions': a.questions  # ✅ Include questions here
             })
+                    # ✅ Script-based assignments
+        script_assignments = ScriptAssignment.query.filter_by(sub_id=subject.sub_id).all()
+        for sa in script_assignments:
+            deadline_formatted = (
+        sa.deadline.strftime('%Y-%m-%d %H:%M')
+        if isinstance(sa.deadline, datetime)
+        else str(sa.deadline).replace('T', ' ')
+    )
+    all_assignments.append({
+        'assignment_id': sa.id,
+        'title': sa.title,
+        'timestamp': 'N/A',
+        'time': deadline_formatted,
+        'type': 'script',
+        'total_marks': sa.total_marks,
+        'subject': subject.s_name,
+        'questions': sa.questions
+    })
+
 
     return render_template('studentdashboard.html', assignments=all_assignments)
 
@@ -448,31 +468,38 @@ def evaluate_submission():
 def evaluate_submission():
     import spacy
     from collections import Counter
-    from sklearn.metrics.pairwise import cosine_similarity
-    from sklearn.feature_extraction.text import TfidfVectorizer
+    from flask import request, jsonify, session
+    from werkzeug.utils import secure_filename
+    from datetime import datetime
+    from PyPDF2 import PdfReader
+    import docx2txt
+    import os
+    import requests
+    import base64
+    import time
 
-    nlp = spacy.load("en_core_web_sm")
+    try:
+        nlp = spacy.load("en_core_web_md")
+    except:
+        nlp = spacy.load("en_core_web_sm")
+        print("⚠️ Warning: Falling back to en_core_web_sm — semantic scoring may be weaker.")
 
     assignment_title = request.form['assignment_title']
     file = request.files['document']
 
     uploads_dir = os.path.join(os.getcwd(), 'uploads')
-    if not os.path.exists(uploads_dir):
-        os.makedirs(uploads_dir)
+    os.makedirs(uploads_dir, exist_ok=True)
 
     filename = secure_filename(file.filename)
     filepath = os.path.join(uploads_dir, filename)
     file.save(filepath)
 
-    # Get assignment
     assignment = Assignment.query.filter_by(title=assignment_title).first()
     if not assignment:
         return jsonify({'error': 'Assignment not found'}), 404
 
-    # Extract keywords
     keywords = [k.strip().lower() for k in assignment.keywords.split(',')] if assignment.keywords else []
 
-    # Extract text from file
     try:
         if filename.endswith('.pdf'):
             reader = PdfReader(filepath)
@@ -485,64 +512,80 @@ def evaluate_submission():
     except Exception as e:
         return jsonify({'error': f"Error reading file: {str(e)}"}), 500
 
-    # Process document with spaCy
     doc = nlp(text.lower())
     words = [token.text for token in doc if token.is_alpha]
     word_freq = Counter(words)
 
-    # ✅ Keyword-based score (max 70)
     match_count = sum(word_freq.get(kw, 0) for kw in keywords)
-    keyword_score = min((match_count / len(keywords)) * 70, 70) if keywords else 0
+    keyword_score = min(match_count / max(len(keywords), 1), 1.0) * 100
 
-    # ✅ Semantic-based score (max 30)
-    sentence_texts = [sent.text.strip() for sent in doc.sents if sent.text.strip()]
-    vectorizer = TfidfVectorizer().fit(keywords + sentence_texts)
-    keyword_vecs = vectorizer.transform(keywords)
-    sentence_vecs = vectorizer.transform(sentence_texts)
+    word_count = len(words)
+    word_score = 100 if word_count >= 100 else word_count
 
-    semantic_matches = 0
-    for kv in keyword_vecs:
-        similarities = cosine_similarity(kv, sentence_vecs)
-        if similarities.max() > 0.5:
-            semantic_matches += 1
-
-    semantic_score = min((semantic_matches / len(keywords)) * 30, 30) if keywords else 0
-
-    # ✅ Final Score
-    total_marks = round(keyword_score + semantic_score, 2)
-    status = "Pass" if total_marks >= 50 else "Fail"
-
-    # Deadline check
     try:
         deadline = datetime.strptime(assignment.time, "%Y-%m-%dT%H:%M")
     except ValueError:
         return jsonify({'error': 'Invalid deadline format'}), 400
 
     on_time = datetime.now() <= deadline
+    deadline_score = 100 if on_time else 0
+
+    semantic_score = 0
+    for kw in keywords:
+        kw_doc = nlp(kw)
+        similarities = [kw_doc.similarity(sent) for sent in doc.sents]
+        if similarities and max(similarities) > 0.75:
+            semantic_score += 1
+    semantic_score = (semantic_score / len(keywords)) * 100 if keywords else 0
+
+    # Updated plagiarism check with Winston AI
+    plagiarism_score = 0
+    try:
+        WINSTON_API_KEY = "a5q1MDQhH20YFDMAfKRKTmutOhrxtIJ7SmTzurjbb40aee90"
+        headers = {
+            "Authorization": f"Bearer {WINSTON_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        data = {
+            "content": text,
+            "filename": filename
+        }
+        response = requests.post("https://api.winston.ai/plagiarism-check", json=data, headers=headers)
+        if response.status_code == 200:
+            resp_json = response.json()
+            plagiarism_score = resp_json.get("plagiarism_percentage", 0)
+        else:
+            raise Exception(f"Winston API failed: {response.text}")
+    except Exception as e:
+        print("Plagiarism check failed:", e)
+
+    plagiarism_penalty = 0 if plagiarism_score <= 20 else 0
+
+    total_score = (keyword_score + word_score + deadline_score + semantic_score + plagiarism_penalty) / 5
+    status = 'Pass' if total_score >= 50 else 'Fail'
+
     student_id = session.get('reg_id')
     subject = Subject.query.filter_by(sub_id=assignment.sub_id).first()
 
-    # Save to Submission
     submission = Submission(
         assignment_id=assignment.id,
         student_id=student_id,
         subject_name=subject.s_name,
         submitted_document=filename,
         upload_time=datetime.now(),
-        marks=total_marks,
+        marks=int(total_score),
         status=status,
         on_time=on_time
     )
     db.session.add(submission)
 
-    # Save to Result
     result = Result(
         assignment_id=assignment.id,
         student_id=student_id,
         subject_name=subject.s_name,
         file_name=filename,
         total_matches=match_count,
-        marks=total_marks,
+        marks=int(total_score),
         status=status,
         on_time=on_time,
         evaluated_at=datetime.now()
@@ -553,12 +596,12 @@ def evaluate_submission():
     return jsonify({
         'title': assignment.title,
         'matches': match_count,
-        'keyword_score': round(keyword_score, 2),
-        'semantic_score': round(semantic_score, 2),
-        'marks': total_marks,
+        'marks': int(total_score),
         'status': status,
-        'on_time': on_time
+        'on_time': on_time,
+        'plagiarism': f"{plagiarism_score:.2f}%"
     })
+
 
     
 @app.route('/teacher/<int:class_id>/performance')
@@ -570,9 +613,85 @@ def student_performance(class_id):
     subjects = Subject.query.filter_by(class_id=class_id).all()
     return render_template('class_dashboard.html', results=results, subjects=subjects, class_id=class_id)
 
+def evaluate_script(compilation_success, deadline_time):
+    on_time = datetime.now() <= deadline_time
+    if compilation_success and on_time:
+        return 100, "✅ Compilation Successful - Submitted on Time", True
+    elif compilation_success:
+        return 70, "✅ Compilation Successful - ❌ Deadline Missed", False
+    else:
+        return 0, "❌ Compilation Failed", False
+
+
+@app.route('/evaluate_script', methods=['POST'])
+def evaluate_script_route():
+    from flask import request, jsonify
+    data = request.get_json()
+    assignment_id = data.get("assignment_id")
+    compilation_success = data.get("compilation_success")
+
+    assignment = Assignment.query.get(assignment_id)
+    if not assignment:
+        return jsonify({'message': 'Assignment not found', 'marks': 0}), 404
+
+    try:
+        deadline_time = datetime.strptime(assignment.time, "%Y-%m-%dT%H:%M")
+    except ValueError:
+        return jsonify({'message': 'Invalid deadline format', 'marks': 0}), 400
+
+    marks, message, _ = evaluate_script(compilation_success, deadline_time)
+    return jsonify({'marks': marks, 'message': message})
+
+
 
 @app.route('/logout')
 def logout():
     session.clear()  # clear all session data
     flash("You have been logged out.")
     return redirect(url_for('login'))  # redirect to login page
+
+@app.route('/subject/<int:sub_id>/assignments/create_script', methods=['GET', 'POST'])
+def create_script_assignment(sub_id):
+    subject = Subject.query.get_or_404(sub_id)
+
+    if request.method == 'POST':
+        title = request.form.get('title')
+        deadline = request.form.get('deadline')
+        total_marks = request.form.get('total_marks')
+        questions = request.form.get('questions', '')
+        rubric_selected = request.form.getlist('rubric_criteria')
+        rubric = ', '.join(rubric_selected)
+        compilation_time = request.form.get('compilation_time')
+        compilation_time = int(compilation_time) if compilation_time and compilation_time.isdigit() else 0
+
+        # Collect test cases dynamically
+        testcases = []
+        i = 1
+        while True:
+            input_key = f'test_input_{i}'
+            output_key = f'test_output_{i}'
+            if input_key in request.form and output_key in request.form:
+                inp = request.form[input_key].strip()
+                out = request.form[output_key].strip()
+                if inp and out:
+                    testcases.append({'input': inp, 'expected_output': out})
+                i += 1
+            else:
+                break
+
+        new_script = ScriptAssignment(
+            title=title,
+            deadline=deadline,
+            total_marks=total_marks,
+            questions=questions,
+            rubric=rubric,
+            compilation_time=compilation_time,
+            testcases=json.dumps(testcases),
+            sub_id=sub_id
+        )
+        db.session.add(new_script)
+        db.session.commit()
+
+        return redirect(url_for('subject_assignments', sub_id=sub_id))
+
+    return render_template('create_script_assignment.html', subject=subject)
