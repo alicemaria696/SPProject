@@ -11,20 +11,15 @@
     .sidebar a {
       color: white; text-decoration: none; display: block; padding: 1rem 1.5rem;
     }
-    .sidebar a:hover {
-      background: #004b93;
-    }
-    .main {
-      padding: 2rem;
-      flex-grow: 1;
-    }
+    .sidebar a:hover { background: #004b93; }
+    .main { padding: 2rem; flex-grow: 1; }
     h2 { margin-top: 0; }
-    .form {
+    .form, .form-box {
       margin-bottom: 2rem;
       background: white; padding: 1rem; border-radius: 10px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-width: 600px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-width: 700px;
     }
-    input, select, button {
+    input, select, button, textarea {
       padding: 0.75rem; margin: 0.5rem 0; width: 100%;
       border-radius: 8px; border: 1px solid #ccc;
     }
@@ -36,10 +31,28 @@
       background: white; padding: 1rem; border-radius: 10px;
       box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-width: 700px;
     }
-    .assignment {
-      padding: 0.75rem 0; border-bottom: 1px solid #eee;
+    .assignment { padding: 0.75rem 0; border-bottom: 1px solid #eee; }
+    .add-btn {
+      display: inline-block; text-decoration: none;
+      background-color: #ff6600; color: white;
+      padding: 0.5rem 1rem; border-radius: 5px;
     }
+    .add-btn:hover { background-color: #e65c00; }
+    .script-btn { background-color: #008000; }
+    .script-btn:hover { background-color: #006400; }
   </style>
+  <script>
+    function addTestCase() {
+      const count = document.querySelectorAll('#testcases-area > div').length + 1;
+      const div = document.createElement('div');
+      div.innerHTML = `
+        <label>Test Case ${count}</label>
+        <textarea name="test_input_${count}" placeholder="Input ${count}" rows="2"></textarea>
+        <textarea name="test_output_${count}" placeholder="Expected Output ${count}" rows="2"></textarea>
+      `;
+      document.getElementById('testcases-area').appendChild(div);
+    }
+  </script>
 </head>
 <body>
   <div class="sidebar">
@@ -53,33 +66,13 @@
   <div class="main">
     <h2>{{ subject.s_name }} – Assignments</h2>
 
-    <div class="form">
-      <form method="POST">
-        <input type="text" name="title" placeholder="Assignment Title" required>
-        <input type="time" name="time" placeholder="Deadline" required>
-        <input type="number" name="total_marks" placeholder="Total Marks" required>
-        <select name="type" required>
-          <option value="" disabled selected>Assignment Type</option>
-          <option value="theory">Theory</option>
-          <option value="script">Script</option>
-        </select>
-        <button type="submit">➕ Add Assignment</button>
-      </form>
+    <!-- Header with Two Buttons -->
+    <div style="display: flex; gap: 1rem; margin-bottom: 2rem;">
+      <a href="/subject/{{ subject.sub_id }}/assignments/create" class="add-btn">➕ Add Theory Assignment</a>
+      <a href="/subject/{{ subject.sub_id }}/assignments/create_script" class="add-btn script-btn">💻 Add Script Assignment</a>
     </div>
 
-    <div class="assignment-list">
-      {% if assignments %}
-        {% for a in assignments %}
-          <div class="assignment">
-            <strong>{{ a.title }}</strong><br>
-            Type: {{ a.type }} | Total Marks: {{ a.total_marks }}<br>
-            Assigned: {{ a.timestamp.strftime("%Y-%m-%d %H:%M") }} | Deadline: {{ a.time }}
-          </div>
-        {% endfor %}
-      {% else %}
-        <p>No assignments yet for this subject.</p>
-      {% endif %}
-    </div>
-  </div>
-</body>
-</html>
+    
+  </body>
+  </html>
+  
