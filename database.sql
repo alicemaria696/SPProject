@@ -107,3 +107,89 @@ CREATE TABLE result (
     evaluated_at DATETIME,
     FOREIGN KEY (assignment_id) REFERENCES assignment(id)
 );
+
+CREATE TABLE script_assignment (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(200) NOT NULL,
+  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+  deadline DATETIME NOT NULL,
+  total_marks INT NOT NULL,
+  questions TEXT,
+  testcases JSON, -- {"input": "...", "expected_output": "..."}
+  rubric TEXT,     -- Checkboxes selected (e.g., Deadline, Test Cases, Compilation Time)
+  compilation_time INT DEFAULT 0, -- in milliseconds
+  sub_id INT NOT NULL,
+  FOREIGN KEY (sub_id) REFERENCES subject(sub_id)
+);
+
+select * from script_assignment;
+
+ALTER TABLE script_assignment 
+ADD COLUMN function_name VARCHAR(100),
+ADD COLUMN function_signature TEXT,
+ADD COLUMN template_code TEXT,
+ADD COLUMN language VARCHAR(20) DEFAULT 'c',
+ADD COLUMN memory_limit INT DEFAULT 128000,
+ADD COLUMN time_limit INT DEFAULT 2;
+
+ALTER TABLE script_assignment MODIFY COLUMN testcases JSON;
+
+CREATE TABLE script_submission (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    script_assignment_id INT NOT NULL,
+    student_id VARCHAR(50) NOT NULL,
+    subject_name VARCHAR(100) NOT NULL,
+    
+    -- Submission details
+    submitted_code TEXT NOT NULL,
+    language_used VARCHAR(20),
+    submission_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Compilation results
+    compilation_status VARCHAR(20), -- 'SUCCESS', 'FAILED'
+    compilation_error TEXT,
+    compilation_time DECIMAL(10,3),
+    
+    -- Test case results summary
+    total_test_cases INT DEFAULT 0,
+    passed_test_cases INT DEFAULT 0,
+    failed_test_cases INT DEFAULT 0,
+    
+    -- Scoring
+    total_marks INT DEFAULT 0,
+    marks_obtained INT DEFAULT 0,
+    
+    -- Rubric-based scoring
+    deadline_marks INT DEFAULT 0,    -- Marks for meeting deadline
+    compilation_marks INT DEFAULT 0, -- Marks for successful compilation
+    testcase_marks INT DEFAULT 0,    -- Marks for passing test cases
+    
+    -- Final evaluation
+    final_status VARCHAR(20), -- 'PASS', 'FAIL'
+    is_on_time BOOLEAN DEFAULT FALSE,
+    
+    FOREIGN KEY (script_assignment_id) REFERENCES script_assignment (id) ON DELETE CASCADE
+);
+
+select * from script_submission;
+
+CREATE TABLE test_case_result (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    submission_id INT NOT NULL,
+    test_case_index INT NOT NULL,  -- Which test case (0, 1, 2...)
+    input_data TEXT,
+    expected_output TEXT,
+    actual_output TEXT,
+    status VARCHAR(20), -- 'PASSED', 'FAILED', 'ERROR', 'TIMEOUT'
+    execution_time DECIMAL(10,3), -- Execution time in seconds
+    memory_used INT, -- Memory used in KB
+    error_message TEXT,  -- Error message if any
+    
+    FOREIGN KEY (submission_id) REFERENCES script_submission (id) ON DELETE CASCADE
+);
+
+select * from test_case_result;
+
+CREATE INDEX idx_script_submission_student ON script_submission(student_id);
+CREATE INDEX idx_script_submission_assignment ON script_submission(script_assignment_id);
+CREATE INDEX idx_test_case_result_submission ON test_case_result(submission_id);
