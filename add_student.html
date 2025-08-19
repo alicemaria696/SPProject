@@ -49,7 +49,7 @@
       box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     }
 
-    input, button {
+    input, select, button {
       display: block;
       width: 100%;
       padding: 0.75rem;
@@ -103,7 +103,15 @@
         <input type="text" name="name" placeholder="Name" required>
         <input type="email" name="email" placeholder="Email" required>
         <input type="text" name="department" placeholder="Department" required>
-        <input type="text" name="class_" placeholder="Class" required>
+        
+        <!-- Class dropdown -->
+        <select name="class_" required>
+          <option value="" disabled selected>Select Class</option>
+          {% for class in classes %}
+            <option value="{{ class.class_id }}">{{ class.class_id }}</option>
+          {% endfor %}
+        </select>
+        
         <input type="password" name="password" placeholder="Password" required>
         <button type="submit">➕ Add Student</button>
       </form>

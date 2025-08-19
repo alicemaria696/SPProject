@@ -6,7 +6,7 @@ from app import app, db
 from app.models import (Teacher, User, Student, Class, Subject, Assignment, 
                        Submission, Result, ScriptAssignment, ScriptSubmission, 
                        TestCaseResult)
-from datetime import datetime
+from datetime import datetime,timedelta
 import csv
 from io import TextIOWrapper
 import os
@@ -102,8 +102,9 @@ def add_student():
         flash('Student added successfully!')
         return redirect(url_for('admin_dashboard'))
 
-    return render_template('add_student.html')
-
+    # Get all classes for the dropdown
+    classes = Class.query.all()
+    return render_template('add_student.html', classes=classes)
 @app.route('/upload_student_csv', methods=['GET', 'POST'])
 def upload_student_csv():
     if request.method == 'POST':
@@ -524,6 +525,110 @@ def logout():
     session.clear()
     flash("You have been logged out.")
     return redirect(url_for('login'))
+
+@app.route('/teacher_activity')
+def teacher_activity():
+    """Show teachers with activity filtering and sorting options"""
+    # Get filter parameters from query string
+    show_filter = request.args.get('show', 'all')  # all, active, inactive
+    sort_filter = request.args.get('sort', 'most_active')  # most_active, least_active, name_asc, name_desc
+    
+    # Calculate date one month ago for inactivity threshold
+    one_month_ago = datetime.now() - timedelta(days=30)
+    
+    # Get all teachers
+    all_teachers = Teacher.query.all()
+    teachers_data = []
+    
+    for teacher in all_teachers:
+        # Get the teacher's subjects
+        subjects = Subject.query.filter_by(teacher_id=teacher.id).all()
+        subject_ids = [subject.sub_id for subject in subjects]
+        subject_names = [subject.s_name for subject in subjects]
+        
+        # Check for regular assignments in the last month
+        recent_regular_assignments = Assignment.query.filter(
+            Assignment.sub_id.in_(subject_ids),
+            Assignment.timestamp >= one_month_ago
+        ).first()
+        
+        # Check for script assignments in the last month
+        recent_script_assignments = ScriptAssignment.query.filter(
+            ScriptAssignment.sub_id.in_(subject_ids),
+            ScriptAssignment.timestamp >= one_month_ago
+        ).first()
+        
+        # Determine if teacher is active (has assignments in last month)
+        is_active = recent_regular_assignments is not None or recent_script_assignments is not None
+        
+        # Find the most recent assignment (if any exists)
+        last_regular = Assignment.query.filter(
+            Assignment.sub_id.in_(subject_ids)
+        ).order_by(Assignment.timestamp.desc()).first()
+        
+        last_script = ScriptAssignment.query.filter(
+            ScriptAssignment.sub_id.in_(subject_ids)
+        ).order_by(ScriptAssignment.timestamp.desc()).first()
+        
+        # Determine the last activity date
+        last_activity = None
+        if last_regular and last_script:
+            last_activity = max(last_regular.timestamp, last_script.timestamp)
+        elif last_regular:
+            last_activity = last_regular.timestamp
+        elif last_script:
+            last_activity = last_script.timestamp
+        
+        # Calculate days since last activity
+        days_since_activity = None
+        if last_activity:
+            days_since_activity = (datetime.now() - last_activity).days
+        
+        teachers_data.append({
+            'id': teacher.id,
+            'name': teacher.name,
+            'reg_id': teacher.reg_id,
+            'email': teacher.email,
+            'department': teacher.department,
+            'last_activity': last_activity,
+            'days_since_activity': days_since_activity,
+            'subjects': subject_names,
+            'is_active': is_active
+        })
+    
+    # Apply filters
+    if show_filter == 'active':
+        teachers_data = [t for t in teachers_data if t['is_active']]
+    elif show_filter == 'inactive':
+        teachers_data = [t for t in teachers_data if not t['is_active']]
+    
+    # Apply sorting
+    if sort_filter == 'most_active':
+        teachers_data.sort(key=lambda x: (
+            x['is_active'],  # Active teachers first
+            -x['days_since_activity'] if x['days_since_activity'] is not None else float('-inf')  # Then by most recent activity
+        ), reverse=True)
+    elif sort_filter == 'least_active':
+        teachers_data.sort(key=lambda x: (
+            not x['is_active'],  # Inactive teachers first
+            x['days_since_activity'] if x['days_since_activity'] is not None else float('inf')  # Then by least recent activity
+        ), reverse=True)
+    elif sort_filter == 'name_asc':
+        teachers_data.sort(key=lambda x: x['name'].lower())
+    elif sort_filter == 'name_desc':
+        teachers_data.sort(key=lambda x: x['name'].lower(), reverse=True)
+    
+    # Count active and inactive teachers
+    active_teachers_count = sum(1 for t in teachers_data if t['is_active'])
+    inactive_teachers_count = sum(1 for t in teachers_data if not t['is_active'])
+    
+    return render_template('teacher_activity.html', 
+                         teachers=teachers_data,
+                         total_teachers=len(all_teachers),
+                         active_teachers_count=active_teachers_count,
+                         inactive_teachers_count=inactive_teachers_count,
+                         show_filter=show_filter,
+                         sort_filter=sort_filter)
 
 @app.route('/subject/<int:sub_id>/assignments/create_script', methods=['GET', 'POST'])
 def create_script_assignment(sub_id):
