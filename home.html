@@ -31,11 +31,14 @@
 
   <div class="container">
   {% for cls in classes %}
-    <div class="card" onclick="window.location.href='/class/{{ cls.id }}/subjects'">
-      {{ cls.class_id }}
-    </div>
+    <a href="{{ url_for('class_dashboard', class_id=cls.id) }}" style="text-decoration:none;">
+      <div class="card">
+        {{ cls.class_id }}
+      </div>
+    </a>
   {% endfor %}
 </div>
+
 
 </body>
 </html>
