@@ -171,20 +171,40 @@ def add_subject(class_id):
     return render_template('add_subject.html', class_id=class_id)
 
 @app.route('/class/<int:class_id>/subjects')
-def view_subjects(class_id):
+def class_dashboard(class_id):
     subjects = Subject.query.filter_by(class_id=class_id).all()
     return render_template('class_dashboard.html', class_id=class_id, subjects=subjects)
 
-@app.route('/class/<int:class_id>/students')
+
+
+
+@app.route("/class/<int:class_id>/students")
 def view_students_by_class(class_id):
-    class_obj = Class.query.get_or_404(class_id)
-    class_name = class_obj.class_id
-    students = Student.query.filter_by(class_=class_name).all()
-    return render_template('students_by_class.html', class_name=class_name, students=students)
+    # Fetch class info from Class model
+    cls = Class.query.filter_by(id=class_id).first()
+    if not cls:
+        return "Class not found", 404
+
+    #  Fix here: filter using class_ (string), not class_id
+    students = Student.query.filter_by(class_=cls.class_id).all()
+
+    # Fetch subjects for sidebar
+    subjects = Subject.query.filter_by(class_id=class_id).all()
+
+    return render_template(
+        "students_by_class.html",
+        class_id=class_id,
+        class_name=cls.class_id,   # ex: "4 MCA A"
+        students=students,
+        subjects=subjects
+    )
+
+
 
 @app.route('/subject/<int:sub_id>/assignments', methods=['GET', 'POST'])
 def subject_assignments(sub_id):
     subject = Subject.query.get_or_404(sub_id)
+
     if request.method == 'POST':
         title = request.form['title']
         time = request.form['time']
@@ -203,9 +223,20 @@ def subject_assignments(sub_id):
         flash("Assignment added.")
         return redirect(url_for('subject_assignments', sub_id=sub_id))
 
+    # ✅ fetch all subjects for this class (so sidebar has them)
+    subjects = Subject.query.filter_by(class_id=subject.class_id).all()
+
     assignments = Assignment.query.filter_by(sub_id=sub_id).all()
     script_assignments = ScriptAssignment.query.filter_by(sub_id=sub_id).all()
-    return render_template("assignment_dashboard.html", subject=subject, assignments=assignments, script_assignments=script_assignments)
+
+    return render_template(
+        "assignment_dashboard.html",
+        subject=subject,
+        subjects=subjects,              # 🔑 now sidebar can list them
+        assignments=assignments,
+        script_assignments=script_assignments
+    )
+
 
 @app.route('/subject/<int:sub_id>/assignments/create', methods=['GET', 'POST'])
 def create_assignment(sub_id):
