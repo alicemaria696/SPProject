@@ -1,78 +1,142 @@
+<!-- assignment_dashboard.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>{{ subject.s_name }} Assignments</title>
+  <title>Assignments - {{ subject.s_name }}</title>
   <style>
-    body { margin: 0; font-family: Arial; display: flex; background-color: #f4f6f8; }
+    body { margin: 0; display: flex; font-family: Arial; background: #f4f6f8; }
     .sidebar {
       width: 220px; background: #002855; color: white; height: 100vh; padding-top: 1rem;
-    }
+    } 
     .sidebar a {
       color: white; text-decoration: none; display: block; padding: 1rem 1.5rem;
     }
-    .sidebar a:hover { background: #004b93; }
-    .main { padding: 2rem; flex-grow: 1; }
-    h2 { margin-top: 0; }
-    .form, .form-box {
-      margin-bottom: 2rem;
-      background: white; padding: 1rem; border-radius: 10px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-width: 700px;
+    .sidebar a:hover {
+      background: #004b93;
     }
-    input, select, button, textarea {
-      padding: 0.75rem; margin: 0.5rem 0; width: 100%;
-      border-radius: 8px; border: 1px solid #ccc;
+    .main {
+      flex-grow: 1;
+      padding: 2rem;
+      overflow-y: auto;
     }
-    button {
-      background-color: #ff6600; color: white; border: none; cursor: pointer;
+    .header {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;
     }
-    button:hover { background-color: #e65c00; }
-    .assignment-list {
-      background: white; padding: 1rem; border-radius: 10px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1); max-width: 700px;
-    }
-    .assignment { padding: 0.75rem 0; border-bottom: 1px solid #eee; }
     .add-btn {
-      display: inline-block; text-decoration: none;
-      background-color: #ff6600; color: white;
-      padding: 0.5rem 1rem; border-radius: 5px;
+      background: #ff6600; color: white; padding: 0.5rem 1rem; border: none;
+      border-radius: 8px; cursor: pointer; text-decoration: none;
     }
-    .add-btn:hover { background-color: #e65c00; }
-    .script-btn { background-color: #008000; }
-    .script-btn:hover { background-color: #006400; }
+    .card {
+      background: white; padding: 1rem; border-radius: 10px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 2rem;
+    }
+    .tabs {
+      display: flex; border-bottom: 2px solid #ddd; margin-bottom: 1rem;
+    }
+    .tab-button {
+      padding: 0.75rem 1.5rem; border: none; cursor: pointer;
+      background: none; border-bottom: 2px solid transparent; font-size: 1rem;
+    }
+    .tab-button.active { border-bottom: 2px solid #002855; color: #002855; font-weight: bold; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { padding: 10px; border-bottom: 1px solid #ddd; text-align: left; }
+    th { background: #002855; color: white; }
   </style>
-  <script>
-    function addTestCase() {
-      const count = document.querySelectorAll('#testcases-area > div').length + 1;
-      const div = document.createElement('div');
-      div.innerHTML = `
-        <label>Test Case ${count}</label>
-        <textarea name="test_input_${count}" placeholder="Input ${count}" rows="2"></textarea>
-        <textarea name="test_output_${count}" placeholder="Expected Output ${count}" rows="2"></textarea>
-      `;
-      document.getElementById('testcases-area').appendChild(div);
-    }
-  </script>
 </head>
 <body>
-  <div class="sidebar">
-    <a href="/home">🏠 Dashboard</a>
-    <a href="#">👨‍🎓 View Students</a>
-    <a href="#">📊 Student Performance</a>
-    <h3 style="text-align: center;">Subjects</h3>
-    <a href="/subject/{{ subject.sub_id }}/assignments">{{ subject.s_name }}</a>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <h3 style="text-align: center; color: white; margin-bottom: 2rem;">Teacher Dashboard</h3>
+  <a href="/teacherdashboard">🏠 Dashboard</a>
+  <a href="{{ url_for('student_performance', class_id=subject.class_id) }}">📊 Student Performance</a>
+  <a href="{{ url_for('view_students_by_class', class_id=subject.class_id) }}">👨🎓 View Students</a>
+  <h3 style="text-align: center; margin-top: 2rem;">📚 Subjects</h3>
+  {% for sub in subjects %}
+    <a href="{{ url_for('subject_assignments', sub_id=sub.sub_id) }}">{{ sub.s_name }}</a>
+  {% else %}
+    <p style="padding: 1rem;">No subjects</p>
+  {% endfor %}
+  <a href="/logout">🚪 Logout</a>
+</div>
+
+<!-- Main content -->
+<div class="main">
+  <div class="header">
+    <h2>📚 Assignments for {{ subject.s_name }}</h2>
+    <a href="{{ url_for('create_assignment', sub_id=subject.sub_id) }}" class="add-btn">➕ Add Assignment</a>
   </div>
 
-  <div class="main">
-    <h2>{{ subject.s_name }} – Assignments</h2>
-
-    <!-- Header with Two Buttons -->
-    <div style="display: flex; gap: 1rem; margin-bottom: 2rem;">
-      <a href="/subject/{{ subject.sub_id }}/assignments/create" class="add-btn">➕ Add Theory Assignment</a>
-      <a href="/subject/{{ subject.sub_id }}/assignments/create_script" class="add-btn script-btn">💻 Add Script Assignment</a>
+  <div class="card">
+    <div class="tabs">
+      <button class="tab-button active" onclick="showTab('regular')">Regular Assignments</button>
+      <button class="tab-button" onclick="showTab('script')">Script Assignments</button>
     </div>
 
-    
-  </body>
-  </html>
-  
+    <!-- Regular Assignments -->
+    <div id="regular-tab" class="tab-content active">
+      {% if assignments %}
+        <table>
+          <tr>
+            <th>Title</th>
+            <th>Deadline</th>
+            <th>Total Marks</th>
+            <th>Type</th>
+          </tr>
+          {% for a in assignments %}
+          <tr>
+            <td>{{ a.title }}</td>
+            <td>{{ a.time }}</td>
+            <td>{{ a.total_marks }}</td>
+            <td>{{ a.type }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      {% else %}
+        <p>No regular assignments yet.</p>
+      {% endif %}
+    </div>
+
+    <!-- Script Assignments -->
+    <div id="script-tab" class="tab-content">
+      {% if script_assignments %}
+        <table>
+          <tr>
+            <th>Title</th>
+            <th>Deadline</th>
+            <th>Total Marks</th>
+            <th>Language</th>
+          </tr>
+          {% for s in script_assignments %}
+          <tr>
+            <td>{{ s.title }}</td>
+            <td>{{ s.time }}</td>
+            <td>{{ s.total_marks }}</td>
+            <td>{{ s.language }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+      {% else %}
+        <p>No script assignments yet.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<script>
+function showTab(tab) {
+  // hide all
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+
+  // show selected
+  document.getElementById(tab + '-tab').classList.add('active');
+  event.target.classList.add('active');
+}
+</script>
+
+</body>
+</html>
