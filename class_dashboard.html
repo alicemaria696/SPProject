@@ -93,16 +93,29 @@
 <body>
 
 <div class="sidebar">
-  <a href="{{ url_for('view_students_by_class', class_id=class_id) }}">👨🎓 View Students</a>
+  <h3 style="text-align: center; color: white; margin-bottom: 2rem;">👨‍🏫 Teacher Dashboard</h3>
+
+  <!-- Dashboard link -->
+  <a href="{{ url_for('home') }}">🏠 Dashboard</a>
+
+  <!-- Student performance -->
   <a href="{{ url_for('student_performance', class_id=class_id) }}">📊 Student Performance</a>
-  <h3 style="text-align: center; margin-top: 2rem;">📚 Subjects</h3>
+
+  <!-- View students -->
+  <a href="{{ url_for('view_students_by_class', class_id=class_id) }}">👨‍🎓 View Students</a>
+
+  <!-- Subjects -->
+  <h4 style="text-align: center; margin-top: 2rem; color: #ffcc00;">📚 Subjects</h4>
   {% for sub in subjects %}
-    <a href="/subject/{{ sub.sub_id }}/assignments">{{ sub.s_name }}</a>
+    <a href="{{ url_for('subject_assignments', sub_id=sub.sub_id) }}">{{ sub.s_name }}</a>
   {% else %}
     <p style="padding: 1rem;">No subjects</p>
   {% endfor %}
+
+  <!-- Logout -->
   <a href="/logout">🚪 Logout</a>
 </div>
+
 
 <div class="main">
   <div class="subject-header">
