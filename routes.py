@@ -237,49 +237,17 @@ def create_assignment(sub_id):
 
 @app.route('/studentdashboard')
 def student_dashboard():
+    """Render student dashboard - assignments will be loaded via AJAX"""
     student_reg_id = session.get('reg_id')
-    student = Student.query.filter_by(reg_id=student_reg_id).first()
-    class_id = Class.query.filter_by(class_id=student.class_).first().id
-    subjects = Subject.query.filter_by(class_id=class_id).all()
-
-    all_assignments = []
+    if not student_reg_id:
+        return redirect(url_for('login'))
     
-    for subject in subjects:
-        # Regular assignments
-        assignments = Assignment.query.filter_by(sub_id=subject.sub_id).all()
-        for a in assignments:
-            formatted_time = a.time.strftime('%Y-%m-%d %H:%M') if isinstance(a.time, datetime) else a.time.replace('T', ' ')
-            all_assignments.append({
-                'assignment_id': a.id,
-                'title': a.title,
-                'timestamp': a.timestamp.strftime('%Y-%m-%d %H:%M'),
-                'time': formatted_time,
-                'type': a.type,
-                'total_marks': a.total_marks,
-                'subject': subject.s_name,
-                'questions': a.questions
-            })
-        
-        # Script-based assignments
-        script_assignments = ScriptAssignment.query.filter_by(sub_id=subject.sub_id).all()
-        for sa in script_assignments:
-            deadline_formatted = (
-                sa.deadline.strftime('%Y-%m-%d %H:%M')
-                if isinstance(sa.deadline, datetime)
-                else str(sa.deadline).replace('T', ' ')
-            )
-            all_assignments.append({
-                'assignment_id': sa.id,
-                'title': sa.title,
-                'timestamp': sa.timestamp.strftime('%Y-%m-%d %H:%M') if sa.timestamp else 'N/A',
-                'time': deadline_formatted,
-                'type': 'script',
-                'total_marks': sa.total_marks,
-                'subject': subject.s_name,
-                'questions': sa.questions
-            })
-
-    return render_template('studentdashboard.html', assignments=all_assignments)
+    student = Student.query.filter_by(reg_id=student_reg_id).first()
+    if not student:
+        flash("Student not found.")
+        return redirect(url_for('login'))
+    
+    return render_template('studentdashboard.html')
 
 @app.route('/upload_submission/<int:assignment_id>', methods=['POST'])
 def upload_submission(assignment_id):
@@ -940,3 +908,70 @@ def get_script_template(assignment_id):
         'language': script_assignment.language,
         'function_signature': script_assignment.function_signature or ''
     })
+    
+@app.route('/get_student_subjects')
+def get_student_subjects():
+    """Get subjects for the current student based on their class"""
+    student_reg_id = session.get('reg_id')
+    if not student_reg_id:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    student = Student.query.filter_by(reg_id=student_reg_id).first()
+    if not student:
+        return jsonify({'error': 'Student not found'}), 404
+    
+    # Get class ID from class name
+    class_obj = Class.query.filter_by(class_id=student.class_).first()
+    if not class_obj:
+        return jsonify({'error': 'Class not found'}), 404
+    
+    # Get subjects for this class
+    subjects = Subject.query.filter_by(class_id=class_obj.id).all()
+    
+    subjects_data = []
+    for subject in subjects:
+        subjects_data.append({
+            'sub_id': subject.sub_id,
+            's_name': subject.s_name
+        })
+    
+    return jsonify({'subjects': subjects_data})
+
+@app.route('/get_subject_assignments/<int:sub_id>')
+def get_subject_assignments(sub_id):
+    """Get all assignments (regular and script) for a specific subject"""
+    assignments_data = []
+    
+    # Get regular assignments
+    regular_assignments = Assignment.query.filter_by(sub_id=sub_id).all()
+    for a in regular_assignments:
+        formatted_time = a.time.strftime('%Y-%m-%d %H:%M') if isinstance(a.time, datetime) else a.time.replace('T', ' ')
+        assignments_data.append({
+            'assignment_id': a.id,
+            'title': a.title,
+            'timestamp': a.timestamp.strftime('%Y-%m-%d %H:%M'),
+            'time': formatted_time,
+            'type': a.type,
+            'total_marks': a.total_marks,
+            'questions': a.questions or 'No description provided'
+        })
+    
+    # Get script assignments
+    script_assignments = ScriptAssignment.query.filter_by(sub_id=sub_id).all()
+    for sa in script_assignments:
+        deadline_formatted = (
+            sa.deadline.strftime('%Y-%m-%d %H:%M')
+            if isinstance(sa.deadline, datetime)
+            else str(sa.deadline).replace('T', ' ')
+        )
+        assignments_data.append({
+            'assignment_id': sa.id,
+            'title': sa.title,
+            'timestamp': sa.timestamp.strftime('%Y-%m-%d %H:%M') if sa.timestamp else 'N/A',
+            'time': deadline_formatted,
+            'type': 'script',
+            'total_marks': sa.total_marks,
+            'questions': sa.questions or 'No description provided'
+        })
+    
+    return jsonify({'assignments': assignments_data})
