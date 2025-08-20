@@ -23,9 +23,16 @@
     .header {
       display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;
     }
+    .btn-group {
+      display: flex;
+      gap: 10px;
+    }
     .add-btn {
       background: #ff6600; color: white; padding: 0.5rem 1rem; border: none;
       border-radius: 8px; cursor: pointer; text-decoration: none;
+    }
+    .add-btn:hover {
+      background: #e65c00;
     }
     .card {
       background: white; padding: 1rem; border-radius: 10px;
@@ -67,7 +74,10 @@
 <div class="main">
   <div class="header">
     <h2>📚 Assignments for {{ subject.s_name }}</h2>
-    <a href="{{ url_for('create_assignment', sub_id=subject.sub_id) }}" class="add-btn">➕ Add Assignment</a>
+    <div class="btn-group">
+      <a href="{{ url_for('create_assignment', sub_id=subject.sub_id) }}" class="add-btn">➕ Add Theory Assignment</a>
+      <a href="{{ url_for('create_script_assignment', sub_id=subject.sub_id) }}" class="add-btn">💻 Add Script Assignment</a>
+    </div>
   </div>
 
   <div class="card">
